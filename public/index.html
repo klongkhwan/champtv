@@ -1,0 +1,915 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>📺 Live Stream Center</title>
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #0c0c0c 0%, #1a1a1a 100%);
+      color: #fff;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    .app-container {
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Control Panel at top */
+    .control-panel {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      background: linear-gradient(to bottom, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0.8) 70%, transparent 100%);
+      padding: 1.5rem;
+      transform: translateY(0);
+      transition: transform 0.5s ease;
+      z-index: 1000; /* ค่าที่สูงมากเพื่อให้แน่ใจว่าอยู่บนสุด */
+      overflow-y: auto;
+    }
+
+    .control-panel.minimized {
+      transform: translateY(calc(-100% + 80px));
+    }
+
+    /* Tabs Container */
+    .tabs-container {
+      margin-bottom: 1.5rem;
+    }
+
+    .tabs {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: rgba(34, 34, 34, 0.9);
+      border-radius: 15px;
+      padding: 8px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+      backdrop-filter: blur(10px);
+    }
+
+    .tabs-left {
+      display: flex;
+      flex: 1;
+      justify-content: center;
+    }
+
+    .tabs-right {
+      display: flex;
+      gap: 10px;
+      margin-left: 15px;
+    }
+
+    .tab {
+      flex: 1;
+      text-align: center;
+      padding: 15px 20px;
+      cursor: pointer;
+      border-radius: 10px;
+      transition: all 0.3s ease;
+      font-weight: 600;
+      font-size: 1.1rem;
+      position: relative;
+      overflow: hidden;
+      margin: 0 4px;
+    }
+
+    .tab::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+      transition: left 0.5s;
+    }
+
+    .tab:hover {
+      background: rgba(255, 255, 255, 0.1);
+      transform: translateY(-2px);
+    }
+
+    .tab:hover::before {
+      left: 100%;
+    }
+
+    .tab.active {
+      background: linear-gradient(45deg, #ff6b6b, #ff8e53);
+      color: white;
+      box-shadow: 0 6px 20px rgba(255, 107, 107, 0.4);
+    }
+
+    /* Content Areas */
+    .tab-content {
+      display: none;
+      animation: fadeIn 0.5s ease-in;
+    }
+
+    .tab-content.active {
+      display: block;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Grid Layout */
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 20px;
+      margin-top: 1rem;
+      padding-right: 10px;
+    }
+
+    .card {
+      background: linear-gradient(145deg, #2a2a2a, #1e1e1e);
+      padding: 15px;
+      border-radius: 15px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: linear-gradient(45deg, rgba(255,107,107,0.1), rgba(255,142,83,0.1));
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+
+    .card:hover {
+      transform: translateY(-8px) scale(1.02);
+      box-shadow: 0 15px 40px rgba(255, 107, 107, 0.2);
+      border-color: rgba(255, 107, 107, 0.5);
+    }
+
+    .card:hover::before {
+      opacity: 1;
+    }
+
+    .card img {
+      width: 100%;
+      height: 120px;
+      object-fit: cover;
+      border-radius: 10px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .card p {
+      font-size: 0.95rem;
+      margin-top: 10px;
+      color: #e0e0e0;
+      font-weight: 500;
+      position: relative;
+      z-index: 1;
+      text-align: center;
+    }
+
+    /* Video Container - Full height remaining space */
+    .video-container {
+      flex: 1; /* ทำให้ video-container ขยายเต็มพื้นที่ที่เหลือ */
+      position: relative;
+      background: #111;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      /* ลบ width: 100% และ height: 100% ออก เพื่อให้ flex: 1 ทำงาน */
+      z-index: 10;
+    }
+
+    video {
+      width: 100%; /* ให้วิดีโอขยายเต็มความกว้างของ video-container */
+      height: 100%; /* ให้วิดีโอขยายเต็มความสูงของ video-container */
+      object-fit: contain; /* ใช้ 'contain' เพื่อให้วิดีโอแสดงผลเต็มโดยไม่ถูกตัด */
+      background: #000;
+    }
+
+    .status-overlay {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      text-align: center;
+      z-index: 50;
+      transition: all 0.5s ease;
+    }
+
+    .status {
+      font-size: 2rem;
+      font-weight: bold;
+      color: #00ff88;
+      background: rgba(0, 0, 0, 0.8);
+      padding: 20px 40px;
+      border-radius: 15px;
+      border: 2px solid rgba(0, 255, 136, 0.3);
+      backdrop-filter: blur(10px);
+      margin-bottom: 15px;
+    }
+
+    .welcome-text {
+      font-size: 1.2rem;
+      color: #ccc;
+      background: rgba(0, 0, 0, 0.6);
+      padding: 10px 20px;
+      border-radius: 10px;
+      backdrop-filter: blur(5px);
+    }
+
+    /* CSS สำหรับดีไซน์ใหม่ แถวละ 2 คู่ */
+    #football-container {
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+    }
+
+    .match-pair-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 15px;
+    }
+
+    .match-card-grid {
+      background-color: #2c2c2c;
+      border-radius: 10px;
+      padding: 10px 15px;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .match-header {
+      border-bottom: 1px solid #444;
+      padding-bottom: 8px;
+      margin-bottom: 8px;
+    }
+
+    .match-info {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 5px;
+    }
+
+    .match-time {
+      font-size: 0.9rem;
+      font-weight: bold;
+      color: #a0a0a0;
+    }
+
+    .match-score {
+      font-size: 1.1rem;
+      font-weight: bold;
+      color: #ffcc00; /* สีเหลืองสำหรับสกอร์ */
+    }
+
+    .match-header h4 {
+      color: #fff;
+      font-size: 1rem;
+      font-weight: 500;
+      margin: 0;
+    }
+
+    .streams-container-grid {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      justify-content: flex-start;
+    }
+
+    .stream-link {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-decoration: none;
+      background-color: #3b3b3b;
+      border-radius: 8px;
+      padding: 8px;
+      cursor: pointer;
+      transition: transform 0.2s, background-color 0.2s;
+      flex-grow: 1;
+      text-align: center;
+      min-width: 80px;
+    }
+
+    .stream-link:hover {
+      transform: translateY(-2px);
+      background-color: #4a4a4a;
+    }
+
+    .stream-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 5px;
+      object-fit: contain;
+      margin-bottom: 5px;
+    }
+
+    .stream-label {
+      font-size: 0.7rem;
+      color: #ccc;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      width: 100%;
+    }
+
+    /* Loading States - Center in content area */
+    .loading {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 250px;
+      font-size: 1.2rem;
+      color: #888;
+      grid-column: 1 / -1;
+      padding: 2rem;
+    }
+
+    .loading-spinner {
+      width: 40px;
+      height: 40px;
+      border: 3px solid rgba(255, 107, 107, 0.3);
+      border-radius: 50%;
+      border-top-color: #ff6b6b;
+      animation: spin 1s linear infinite;
+      margin-bottom: 15px;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .empty {
+      text-align: center;
+      padding: 3rem;
+      color: #666;
+      font-size: 1.1rem;
+      grid-column: 1 / -1;
+    }
+
+    /* Tab buttons on the right */
+    .tab-btn {
+      background: rgba(255, 255, 255, 0.1);
+      border: none;
+      border-radius: 8px;
+      width: 45px;
+      height: 45px;
+      font-size: 1.2rem;
+      color: white;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .tab-btn:hover {
+      background: rgba(255, 255, 255, 0.2);
+      transform: scale(1.05);
+    }
+
+    .tab-btn.reload {
+      background: linear-gradient(45deg, #4CAF50, #45a049);
+      box-shadow: 0 4px 15px rgba(76, 175, 80, 0.4);
+    }
+
+    .tab-btn.reload:hover {
+      box-shadow: 0 6px 20px rgba(76, 175, 80, 0.6);
+    }
+
+    .tab-btn.minimize {
+      background: linear-gradient(45deg, #ff6b6b, #ff8e53);
+      box-shadow: 0 4px 15px rgba(255, 107, 107, 0.4);
+    }
+
+    .tab-btn.minimize:hover {
+      box-shadow: 0 6px 20px rgba(255, 107, 107, 0.6);
+    }
+
+    /* Show controls button - only this one stays in top right */
+    .show-controls-btn {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: linear-gradient(45deg, #ff6b6b, #ff8e53);
+      border: none;
+      border-radius: 50%;
+      width: 60px;
+      height: 60px;
+      font-size: 1.5rem;
+      color: white;
+      cursor: pointer;
+      box-shadow: 0 8px 25px rgba(255, 107, 107, 0.6);
+      transition: all 0.3s ease;
+      z-index: 1000;
+      opacity: 0;
+      pointer-events: none;
+      z-index: 1001;
+    }
+
+    .show-controls-btn.visible {
+      opacity: 1;
+      pointer-events: all;
+    }
+
+    .show-controls-btn:hover {
+      transform: scale(1.1);
+      box-shadow: 0 12px 35px rgba(255, 107, 107, 0.8);
+    }
+
+    /* Hide controls when video is playing */
+    .controls-hidden .control-panel {
+      transform: translateY(calc(-100% + 10px));
+    }
+
+    .video-playing .status-overlay {
+      opacity: 0;
+      pointer-events: none;
+    }
+    /* body.video-playing {
+      padding-top: 10px; 
+    } */
+    /* หรือความสูงของ control-panel เมื่อถูก minimize */
+
+    /* Scrollbar */
+    .grid::-webkit-scrollbar, .control-panel::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    .grid::-webkit-scrollbar-track, .control-panel::-webkit-scrollbar-track {
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 10px;
+    }
+
+    .grid::-webkit-scrollbar-thumb, .control-panel::-webkit-scrollbar-thumb {
+      background: linear-gradient(45deg, #ff6b6b, #ff8e53);
+      border-radius: 10px;
+    }
+
+    .grid::-webkit-scrollbar-thumb:hover, .control-panel::-webkit-scrollbar-thumb:hover {
+      background: linear-gradient(45deg, #ff5252, #ff7043);
+    }
+
+    /* Mobile Responsive */
+    @media (max-width: 768px) {
+      .tabs {
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .tabs-left {
+        flex-direction: column;
+        gap: 8px;
+        width: 100%;
+      }
+
+      .tabs-right {
+        flex-direction: row;
+        justify-content: center;
+        margin-left: 0;
+        margin-top: 10px;
+      }
+      
+      .tab {
+        padding: 12px 15px;
+        font-size: 1rem;
+        margin: 0;
+      }
+      
+      .grid {
+        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+        gap: 15px;
+      }
+
+      .control-panel {
+        padding: 1rem;
+        max-height: 80vh; /* กำหนดความสูงสูงสุดเป็น 80% ของความสูงหน้าจอ */
+        overflow-y: auto;
+      }
+
+      .top-right-buttons {
+        top: 10px;
+        right: 10px;
+        gap: 8px;
+      }
+
+      .reload-btn, .show-controls-btn {
+        width: 50px;
+        height: 50px;
+        font-size: 1.2rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-container">
+    <div class="control-panel" id="controlPanel">
+      <div class="tabs-container">
+        <div class="tabs">
+          <div class="tabs-left">
+            <div class="tab active" data-tab="tv">📺 ช่องทีวี</div>
+            <div class="tab" data-tab="football">⚽ ฟุตบอลสด</div>
+            <div class="tab" data-tab="volleyball">🏐 วอลเล่ย์บอลสด</div>
+          </div>
+          <div class="tabs-right">
+            <button class="tab-btn reload" onclick="reloadAllTabs()" title="รีโหลดทุกแท็บ">🔄</button>
+            <button class="tab-btn minimize" onclick="minimizeControls()" title="ย่อเมนู">⬇️</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="tv-content" class="tab-content active">
+        <div id="tv-container" class="grid">
+          <div class="loading">
+            <div class="loading-spinner"></div>
+            กำลังโหลดช่องทีวี...
+          </div>
+        </div>
+      </div>
+
+      <div id="football-content" class="tab-content">
+        <div id="football-container" class="grid"></div>
+      </div>
+
+      <div id="volleyball-content" class="tab-content">
+        <div id="volleyball-container" class="grid"></div>
+      </div>
+    </div>
+
+    <div class="video-container">
+      <div class="status-overlay" id="statusOverlay">
+        <div class="status">เลือกช่องเพื่อเริ่มดู</div>
+      </div>
+      <video id="player" controls style="display: none;"></video>
+    </div>
+
+    <button class="show-controls-btn" id="showControlsBtn" onclick="showControls()" title="แสดงเมนู">📋</button>
+  </div>
+
+  <script>
+    const player = document.getElementById("player");
+    const statusOverlay = document.getElementById("statusOverlay");
+    const videoContainer = document.querySelector(".video-container");
+    const controlPanel = document.getElementById("controlPanel");
+    const showControlsBtn = document.getElementById("showControlsBtn");
+    
+    let currentTab = 'tv';
+    let loadedTabs = new Set();
+    let hideControlsTimer = null;
+    let isVideoPlaying = false;
+
+    // BASE URL ของ stream ทีวี
+    const BASE_TV_URL = "https://dkl-c33es.cdn.akamaiz.com/dooballfree24hr/";
+
+    // ฟังก์ชันเล่นสตรีม
+    function playStream(url, label) {
+      statusOverlay.style.display = 'none';
+      player.style.display = 'block';
+      document.body.classList.add('video-playing'); // เพิ่ม class video-playing ที่ body
+      document.body.classList.remove('controls-hidden');
+      showControlsBtn.classList.remove('visible');
+      
+      if (hideControlsTimer) {
+        clearTimeout(hideControlsTimer);
+      }
+      
+      if (Hls.isSupported()) {
+        const hls = new Hls();
+        hls.loadSource(url);
+        hls.attachMedia(player);
+      } else if (player.canPlayType("application/vnd.apple.mpegurl")) {
+        player.src = url;
+      }
+      
+      player.play();
+      isVideoPlaying = true;
+      
+      hideControlsTimer = setTimeout(() => {
+        hideControls();
+      }, 5000);
+    }
+
+    // เริ่มนับเวลาซ่อน controls (5 วินาที)
+    function startHideControlsTimer() {
+      if (hideControlsTimer) {
+        clearTimeout(hideControlsTimer);
+      }
+      
+      hideControlsTimer = setTimeout(() => {
+        hideControls();
+      }, 5000);
+    }
+
+    // ซ่อน controls
+    function hideControls() {
+      document.body.classList.add('controls-hidden');
+      showControlsBtn.classList.add('visible');
+    }
+
+    // แสดง controls
+    function showControls() {
+      document.body.classList.remove('controls-hidden');
+      showControlsBtn.classList.remove('visible');
+      
+      if (isVideoPlaying) {
+        if (hideControlsTimer) {
+          clearTimeout(hideControlsTimer);
+        }
+        hideControlsTimer = setTimeout(() => {
+          hideControls();
+        }, 5000);
+      }
+    }
+
+    // ฟังก์ชันย่อ controls
+    function minimizeControls() {
+      hideControls();
+    }
+
+    // ฟังก์ชันรีโหลดทุกแท็บ
+    function reloadAllTabs() {
+      loadedTabs.clear();
+      loadTabContent(currentTab);
+    }
+
+    // ฟังก์ชันสลับแท็บ
+    function switchTab(tabName) {
+      document.querySelectorAll('.tab-content').forEach(content => {
+        content.classList.remove('active');
+      });
+
+      document.querySelectorAll('.tab').forEach(tab => {
+        tab.classList.remove('active');
+      });
+
+      document.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
+      document.getElementById(`${tabName}-content`).classList.add('active');
+
+      currentTab = tabName;
+
+      if (!loadedTabs.has(tabName)) {
+        loadTabContent(tabName);
+      }
+      
+      showControls();
+    }
+
+    // ฟังก์ชันโหลดข้อมูลแต่ละแท็บ
+    function loadTabContent(tabName) {
+      switch(tabName) {
+        case 'tv':
+          loadTV();
+          break;
+        case 'football':
+          loadFootball();
+          break;
+        case 'volleyball':
+          loadVolleyball();
+          break;
+      }
+      loadedTabs.add(tabName);
+    }
+
+    // Event listeners สำหรับแท็บ
+    document.querySelectorAll('.tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        const tabName = tab.getAttribute('data-tab');
+        switchTab(tabName);
+      });
+    });
+
+    // หยุดการนับเวลาเมื่อ hover control panel
+    controlPanel.addEventListener('mouseenter', () => {
+      if (hideControlsTimer) {
+        clearTimeout(hideControlsTimer);
+      }
+    });
+
+    // เริ่มนับเวลาใหม่เมื่อเมาส์ออกจาก control panel
+    controlPanel.addEventListener('mouseleave', () => {
+      if (isVideoPlaying) {
+        startHideControlsTimer();
+      }
+    });
+    
+    // โหลดช่องทีวี
+    async function loadTV() {
+      const container = document.getElementById("tv-container");
+      container.innerHTML = `<div class="loading">
+          <div class="loading-spinner"></div>
+          กำลังโหลดช่องทีวี...
+        </div>`;
+      try {
+        const res = await fetch("/api/tv");
+        const data = await res.json();
+        container.innerHTML = "";
+
+        const allChannels = (data.generalTV || []).concat(data.sports || []);
+
+        if (allChannels.length === 0) {
+          container.innerHTML = '<div class="empty">ไม่พบช่องทีวี</div>';
+          return;
+        }
+
+        allChannels.forEach((ch) => {
+          const div = document.createElement("div");
+          div.className = "card";
+          div.innerHTML = `<img src="${ch.image}" alt="${ch.channelName}" loading="lazy">
+            <p>${ch.channelName}</p>`;
+          div.onclick = () => {
+            let urlKey = ch.link;
+            let finalUrl = urlKey;
+            if (!urlKey.startsWith("http")) {
+              finalUrl = BASE_TV_URL + urlKey + "/chunks.m3u8";
+            }
+            const proxyUrl = `/api/tv/stream?url=${encodeURIComponent(finalUrl)}`;
+            playStream(proxyUrl, ch.channelName);
+          };
+          container.appendChild(div);
+        });
+      } catch (error) {
+        container.innerHTML = '<div class="empty">เกิดข้อผิดพลาดในการโหลดข้อมูล</div>';
+        console.error('Error loading TV:', error);
+      }
+    }
+
+    // โหลดฟุตบอลสด (ปรับปรุงการแสดงผลให้เป็นแถวละ 2 คู่)
+    async function loadFootball() {
+      const container = document.getElementById("football-container");
+      container.innerHTML = `<div class="loading">
+        <div class="loading-spinner"></div>
+        กำลังโหลดฟุตบอลสด...
+      </div>`;
+      try {
+        const res = await fetch("/api/football");
+        const data = await res.json();
+        container.innerHTML = "";
+
+        const matches = data.data || [];
+        if (matches.length === 0) {
+          container.innerHTML = '<div class="empty">ไม่มีการแข่งขันในขณะนี้</div>';
+          return;
+        }
+
+        const groupedMatches = new Map();
+        matches.forEach(match => {
+          const matchKey = `${match.homeTeam} vs ${match.awayTeam}`;
+          if (!groupedMatches.has(matchKey)) {
+            groupedMatches.set(matchKey, {
+              time: match.time,
+              score: match.score,
+              homeTeam: match.homeTeam,
+              awayTeam: match.awayTeam,
+              streams: []
+            });
+          }
+          groupedMatches.get(matchKey).streams = groupedMatches.get(matchKey).streams.concat(match.streams);
+        });
+
+        const matchesArray = Array.from(groupedMatches.values());
+        
+        // สร้าง div สำหรับบรรจุคู่การแข่งขัน 2 คู่ในแต่ละแถว
+        for (let i = 0; i < matchesArray.length; i += 2) {
+          const pairRow = document.createElement("div");
+          pairRow.className = "match-pair-row";
+
+          // เพิ่มคู่การแข่งขันคู่แรก
+          const firstMatchData = matchesArray[i];
+          const firstMatchDiv = createMatchCard(firstMatchData);
+          pairRow.appendChild(firstMatchDiv);
+
+          // ถ้ามีคู่ที่สอง ก็เพิ่มเข้าไปในแถวเดียวกัน
+          if (i + 1 < matchesArray.length) {
+            const secondMatchData = matchesArray[i + 1];
+            const secondMatchDiv = createMatchCard(secondMatchData);
+            pairRow.appendChild(secondMatchDiv);
+          }
+          
+          container.appendChild(pairRow);
+        }
+
+      } catch (error) {
+        container.innerHTML = '<div class="empty">เกิดข้อผิดพลาดในการโหลดข้อมูล</div>';
+        console.error('Error loading football:', error);
+      }
+    }
+
+    // ฟังก์ชันแยกสำหรับสร้างการ์ดแต่ละคู่
+    function createMatchCard(matchData) {
+        const matchDiv = document.createElement("div");
+        matchDiv.className = "match-card-grid";
+        
+        const matchHeader = document.createElement("div");
+        matchHeader.className = "match-header";
+        matchHeader.innerHTML = `
+          <div class="match-info">
+            <span class="match-time">${matchData.time}</span>
+            <span class="match-score">${matchData.score}</span>
+          </div>
+          <h4>${matchData.homeTeam} vs ${matchData.awayTeam}</h4>
+        `;
+        
+        const streamsContainer = document.createElement("div");
+        streamsContainer.className = "streams-container-grid";
+        
+        const limitedStreams = matchData.streams.slice(0, 3);
+
+        limitedStreams.forEach(stream => {
+          const streamLink = document.createElement("a");
+          streamLink.className = "stream-link";
+          streamLink.href = "#";
+          streamLink.onclick = (e) => {
+            e.preventDefault();
+            const proxyUrl = `/api/football/stream?url=${encodeURIComponent(stream.dataUrl)}`;
+            playStream(proxyUrl, `${matchData.homeTeam} vs ${matchData.awayTeam}`);
+          };
+          streamLink.innerHTML = `<img src="${stream.img}" alt="${stream.alt}" loading="lazy" class="stream-icon">
+                                  <span class="stream-label">${stream.alt}</span>`;
+          streamsContainer.appendChild(streamLink);
+        });
+        
+        matchDiv.appendChild(matchHeader);
+        matchDiv.appendChild(streamsContainer);
+        return matchDiv;
+    }
+
+
+    async function loadVolleyball() {
+      const container = document.getElementById("volleyball-container");
+      container.innerHTML = `<div class="loading">
+          <div class="loading-spinner"></div>
+          กำลังโหลดวอลเล่ย์บอลสด...
+        </div>`;
+      try {
+        const res = await fetch("/api/live/volleyball");
+        const data = await res.json();
+        container.innerHTML = "";
+
+        const games = data || [];
+        if (games.length === 0) {
+          container.innerHTML = '<div class="empty">ไม่มีการแข่งขันในขณะนี้</div>';
+          return;
+        }
+
+        games.forEach((game) => {
+          const div = document.createElement("div");
+          div.className = "card";
+          div.innerHTML = `<div style="height: 120px; background: linear-gradient(45deg, #ff6b6b, #ff8e53); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 2.5rem;">🏐</div>
+            <p>${game.match}</p>`;
+          div.onclick = () => {
+            // สั่งให้ playStream() เล่น URL ของไฟล์ m3u8 โดยตรง
+            playStream(game.src, game.match);
+          };
+          container.appendChild(div);
+        });
+      } catch (error) {
+        container.innerHTML = '<div class="empty">เกิดข้อผิดพลาดในการโหลดข้อมูล</div>';
+        console.error('Error loading volleyball:', error);
+      }
+    }
+
+    // Keyboard shortcuts
+    document.addEventListener('keydown', (e) => {
+      if (e.key === ' ' || e.key === 'Enter') {
+        if (document.body.classList.contains('controls-hidden')) {
+          showControls();
+          e.preventDefault();
+        }
+      }
+      
+      // กด R เพื่อรีโหลดทุกแท็บ
+      if (e.key === 'r' || e.key === 'R') {
+        reloadAllTabs();
+        e.preventDefault();
+      }
+    });
+
+    // เริ่มต้นโหลดแท็บแรก (ทีวี)
+    loadTabContent('tv');
+</script>
+</body>
+</html>

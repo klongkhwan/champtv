@@ -1,0 +1,206 @@
+{
+  "generalTV": [
+    {
+      "channelName": "ไทยรัฐทีวี",
+      "image": "https://dookeela.live/uploads/1686800227.png",
+      "link": "thairathtv"
+    },
+    {
+      "channelName": "ช่อง 3",
+      "image": "https://dookeela.live/uploads/1685812254.png",
+      "link": "ch3hd"
+    },
+    {
+      "channelName": "ช่อง 7",
+      "image": "https://dookeela.live/uploads/1688059473.png",
+      "link": "ch7hd"
+    },
+    {
+      "channelName": "GMM25",
+      "image": "https://dookeela.live/uploads/1725896937.png",
+      "link": "gmm25"
+    },
+    {
+      "channelName": "AmarinTV HD",
+      "image": "https://dookeela.live/uploads/1704117706.png",
+      "link": "amarintv"
+    },
+    {
+      "channelName": "CH8",
+      "image": "https://dookeela.live/uploads/1704117313.png",
+      "link": "ch8"
+    },
+    {
+      "channelName": "Workpoint TV",
+      "image": "https://dookeela.live/uploads/1725896683.png",
+      "link": "workpointtv"
+    },
+    {
+      "channelName": "PPTV",
+      "image": "https://dookeela.live/uploads/1664499074.png",
+      "link": "pptv"
+    },
+    {
+      "channelName": "one31",
+      "image": "https://dookeela.live/uploads/1683394005.png",
+      "link": "one31"
+    },
+    {
+      "channelName": "Monomax 1",
+      "image": "https://dookeela.live/uploads/1753517049.png",
+      "link": "monomax1"
+    },
+    {
+      "channelName": "True 4 U",
+      "image": "https://dookeela.live/uploads/1725896844.png",
+      "link": "true4u"
+    },
+    {
+      "channelName": "True 4K",
+      "image": "https://dookeela.live/uploads/1736811193.png",
+      "link": "true4k"
+    },
+    {
+      "channelName": "T Sports 7",
+      "image": "https://dookeela.live/uploads/1673134276.png",
+      "link": "tsports7"
+    },
+    {
+      "channelName": "ช่อง 5",
+      "image": "https://dookeela.live/uploads/1664574997.png",
+      "link": "ch5hd"
+    },
+    {
+      "channelName": "True Series",
+      "image": "https://dookeela.live/uploads/1719205991.png",
+      "link": "trueseries"
+    },
+    {
+      "channelName": "True Thai Film",
+      "image": "https://dookeela.live/uploads/1706539896.png",
+      "link": "truethaifilm"
+    },
+    {
+      "channelName": "MONO29 Plus",
+      "image": "https://dookeela.live/uploads/1703787733.png",
+      "link": "mono29plus"
+    },
+    {
+      "channelName": "HBO",
+      "image": "https://dookeela.live/uploads/1703686191.png",
+      "link": "hbo"
+    },
+    {
+      "channelName": "HBO Hits",
+      "image": "https://dookeela.live/uploads/1703786599.png",
+      "link": "hbo-hits"
+    }
+  ],
+  "sports": [
+    {
+      "channelName": "True Premier Football 3",
+      "image": "https://dookeela.live/uploads/1664499681.png",
+      "link": "tpf3"
+    },
+    {
+      "channelName": "True Premier Football 4",
+      "image": "https://dookeela.live/uploads/1664499692.png",
+      "link": "tpf4"
+    },
+    {
+      "channelName": "True Premier Football 5",
+      "image": "https://dookeela.live/uploads/1664499700.png",
+      "link": "tpf5"
+    },
+    {
+      "channelName": "truesports 1",
+      "image": "https://dookeela.live/uploads/1664802455.png",
+      "link": "tsp1"
+    },
+    {
+      "channelName": "truesports 2",
+      "image": "https://dookeela.live/uploads/1664499966.png",
+      "link": "tsp2"
+    },
+    {
+      "channelName": "truesports 3",
+      "image": "https://dookeela.live/uploads/1664802480.png",
+      "link": "tsp3"
+    },
+    {
+      "channelName": "truesports 4",
+      "image": "https://dookeela.live/uploads/1717396131.png",
+      "link": "tsp4"
+    },
+    {
+      "channelName": "truesports 5",
+      "image": "https://dookeela.live/uploads/1664847910.png",
+      "link": "tsp5"
+    },
+    {
+      "channelName": "truesports 7",
+      "image": "https://dookeela.live/uploads/1664847921.png",
+      "link": "tsp7"
+    },
+    {
+      "channelName": "ทรูไอดี สปอร์ต",
+      "image": "https://dookeela.live/uploads/1743311087.png",
+      "link": "trueidsports1"
+    },
+    {
+      "channelName": "บีอินสปอตส์ 1",
+      "image": "https://dookeela.live/uploads/1664500365.png",
+      "link": "bein1"
+    },
+    {
+      "channelName": "บีอินสปอตส์ 1 (617)",
+      "image": "https://dookeela.live/uploads/1726690688.png",
+      "link": "bein1_617"
+    },
+    {
+      "channelName": "บีอินสปอตส์ 10",
+      "image": "https://dookeela.live/uploads/1724346113.png",
+      "link": "bein10"
+    },
+    {
+      "channelName": "บีอินสปอตส์ 2",
+      "image": "https://dookeela.live/uploads/1690843424.png",
+      "link": "bein2"
+    },
+    {
+      "channelName": "บีอินสปอตส์ 3",
+      "image": "https://dookeela.live/uploads/1663980670.png",
+      "link": "bein3"
+    },
+    {
+      "channelName": "บีอินสปอตส์ 4",
+      "image": "https://dookeela.live/uploads/1692816640.png",
+      "link": "bein4"
+    },
+    {
+      "channelName": "บีอินสปอตส์ 5",
+      "image": "https://dookeela.live/uploads/1693290376.png",
+      "link": "bein5"
+    },
+    {
+      "channelName": "บีอินสปอตส์ 6",
+      "image": "https://dookeela.live/uploads/1694719513.png",
+      "link": "bein6"
+    },
+    {
+      "channelName": "บีอินสปอตส์ 7",
+      "image": "https://dookeela.live/uploads/1694719622.png",
+      "link": "bein7"
+    },
+    {
+      "channelName": "บีอินสปอตส์ 8",
+      "image": "https://dookeela.live/uploads/1724241278.png",
+      "link": "bein8"
+    },
+    {
+      "channelName": "บีอินสปอตส์ 9",
+      "image": "https://dookeela.live/uploads/1724241287.png",
+      "link": "bein9"
+    }
+  ]
+}
