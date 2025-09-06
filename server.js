@@ -3,13 +3,13 @@ import express from "express";
 import { chromium } from "playwright";
 import fs from "fs";
 import path from "path";
-import fetch from "node-fetch"; // ถ้าจะใช้ fetch global ของ Node 18+ ก็ได้ แต่ใช้ตัวนี้ง่ายสุดสำหรับ .pipe()
+import fetch from "node-fetch";
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 app.use(express.static("public"));
 
-// ================== BROWSER SINGLETON (ปรับใหม่) ==================
+// ================== BROWSER SINGLETON ==================
 let browser;
 async function getBrowser() {
   if (!browser) {
@@ -46,7 +46,9 @@ async function scrapeFootballList() {
         try {
           const timeCols = row.querySelectorAll("div.col-lg-1");
           timeCols.forEach((timeCol) => {
-            const hasLive = timeCol.querySelector('img[src="https://api-soccer.thai-play.com/images/live.gif"]');
+            const hasLive = timeCol.querySelector(
+              'img[src="https://api-soccer.thai-play.com/images/live.gif"]'
+            );
             if (!hasLive) return;
 
             const time = timeCol.innerText.replace(/\s+/g, " ").trim().replace("LIVE", "").trim();
@@ -54,7 +56,7 @@ async function scrapeFootballList() {
             if (!teamCol) return;
 
             const homeTeam = teamCol.querySelector("div.text-end p")?.innerText.trim() || "";
-            const score    = teamCol.querySelector("div.col-lg-2 p")?.innerText.trim() || "";
+            const score = teamCol.querySelector("div.col-lg-2 p")?.innerText.trim() || "";
             const awayTeam = teamCol.querySelector("div.text-start p")?.innerText.trim() || "";
 
             const tvBlock = teamCol.nextElementSibling;
@@ -116,6 +118,8 @@ async function scrapeVolleyballList() {
 }
 
 // ================== API ==================
+
+// Football list (cache 60s)
 app.get("/api/football", async (req, res) => {
   try {
     if (Date.now() - footballCacheTime < 60000 && footballCache) {
@@ -132,7 +136,7 @@ app.get("/api/football", async (req, res) => {
   }
 });
 
-// Football stream proxy (.m3u8 และ .ts)
+// Football stream proxy (.m3u8 & .ts)
 app.get("/api/football/stream", async (req, res) => {
   const streamUrl = req.query.url;
   if (!streamUrl) return res.status(400).json({ success: false, error: "Missing url parameter" });
@@ -149,13 +153,11 @@ app.get("/api/football/stream", async (req, res) => {
     };
     if (req.headers.range) headers.Range = req.headers.range;
 
-    const response = await fetch(streamUrl, { headers });
-
+    const response = await fetch(streamUrl, { headers, redirect: "follow" });
     if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
 
     const contentType = response.headers.get("content-type") || "application/vnd.apple.mpegurl";
 
-    // ถ้าเป็น playlist .m3u8 → rewrite ลิงก์ให้วิ่งผ่าน proxy นี้ต่อ
     if (streamUrl.includes(".m3u8") || contentType.includes("mpegurl")) {
       const text = await response.text();
       const baseUrl = streamUrl.substring(0, streamUrl.lastIndexOf("/") + 1);
@@ -172,13 +174,13 @@ app.get("/api/football/stream", async (req, res) => {
       });
       res.send(modified);
     } else {
-      // ไฟล์ segment .ts หรืออื่นๆ → pipe ตรง
       res.set({
         "Content-Type": contentType,
         "Access-Control-Allow-Origin": "*",
         "Cache-Control": "no-cache, no-store, must-revalidate",
+        "Accept-Ranges": "bytes",
       });
-      response.body.pipe(res);
+      response.body.pipe(res); // ใช้ได้เลย
     }
   } catch (err) {
     console.error("Error proxying football stream:", err);
@@ -186,6 +188,7 @@ app.get("/api/football/stream", async (req, res) => {
   }
 });
 
+// Volleyball
 app.get("/api/live/volleyball", async (_req, res) => {
   try {
     if (Date.now() - volleyballCacheTime < 60000 && volleyballCache) {
@@ -202,6 +205,7 @@ app.get("/api/live/volleyball", async (_req, res) => {
   }
 });
 
+// TV list
 app.get("/api/tv", (_req, res) => {
   try {
     const tvDataPath = path.join(process.cwd(), "tv.json");
@@ -212,6 +216,7 @@ app.get("/api/tv", (_req, res) => {
   }
 });
 
+// TV stream proxy
 app.get("/api/tv/stream", async (req, res) => {
   const targetUrl = req.query.url;
   if (!targetUrl) return res.status(400).json({ success: false, error: "Missing url parameter" });
@@ -222,6 +227,7 @@ app.get("/api/tv/stream", async (req, res) => {
         "Referer": "https://www.dooballfree24hrs.com/",
         "User-Agent": req.headers["user-agent"] || "Mozilla/5.0",
       },
+      redirect: "follow",
     });
 
     const contentType = response.headers.get("content-type") || "";
@@ -243,6 +249,7 @@ app.get("/api/tv/stream", async (req, res) => {
   }
 });
 
+// Health check
 app.get("/api/health", (_req, res) => {
   res.json({ status: "OK", timestamp: new Date().toISOString() });
 });
