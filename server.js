@@ -15,7 +15,13 @@ async function getBrowser() {
   if (!browser) {
     browser = await chromium.launch({
       headless: true,
-      args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"],
+      args: [
+        "--no-sandbox", 
+        "--disable-setuid-sandbox", 
+        "--disable-dev-shm-usage",
+        "--disable-web-security",
+        "--disable-features=VizDisplayCompositor"
+      ],
     });
     console.log("✅ Chromium started");
   }
@@ -28,11 +34,32 @@ let footballCacheTime = 0;
 let volleyballCache = null;
 let volleyballCacheTime = 0;
 
+// ================== COMMON HEADERS ==================
+const getCommonHeaders = (referer = null) => ({
+  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+  "Accept": "*/*",
+  "Accept-Language": "th-TH,th;q=0.9,en-US;q=0.8,en;q=0.7",
+  "Accept-Encoding": "gzip, deflate, br",
+  "Connection": "keep-alive",
+  "Cache-Control": "no-cache",
+  "Pragma": "no-cache",
+  "Sec-Fetch-Dest": "empty",
+  "Sec-Fetch-Mode": "cors",
+  "Sec-Fetch-Site": "cross-site",
+  "sec-ch-ua": '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
+  "sec-ch-ua-mobile": "?0",
+  "sec-ch-ua-platform": '"Windows"',
+  ...(referer && { "Referer": referer }),
+});
+
 // ================== SCRAPE FOOTBALL ==================
 async function scrapeFootballList() {
   const b = await getBrowser();
   const page = await b.newPage();
   try {
+    // Set extra headers
+    await page.setExtraHTTPHeaders(getCommonHeaders());
+    
     await page.goto("https://doofootball.vip/new-doofootball-vip-2025/", {
       waitUntil: "networkidle",
       timeout: 30000,
@@ -49,7 +76,8 @@ async function scrapeFootballList() {
             const hasLive = timeCol.querySelector(
               'img[src="https://api-soccer.thai-play.com/images/live.gif"]'
             );
-            if (!hasLive) return;
+            // if (!hasLive) return; 
+            //บรรทัดบนถ้าไม่สน
 
             const time = timeCol.innerText.replace(/\s+/g, " ").trim().replace("LIVE", "").trim();
             const teamCol = timeCol.nextElementSibling;
@@ -87,11 +115,10 @@ async function scrapeFootballList() {
 // ================== SCRAPE VOLLEYBALL ==================
 async function scrapeVolleyballList() {
   const b = await getBrowser();
-  const page = await b.newPage({
-    userAgent:
-      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115 Safari/537.36",
-  });
+  const page = await b.newPage();
   try {
+    await page.setExtraHTTPHeaders(getCommonHeaders());
+    
     await page.goto("https://pixielive.vip/volleyball-women-world-championship-2025/", {
       waitUntil: "domcontentloaded",
       timeout: 30000,
@@ -142,19 +169,44 @@ app.get("/api/football/stream", async (req, res) => {
   if (!streamUrl) return res.status(400).json({ success: false, error: "Missing url parameter" });
 
   try {
-    const headers = {
-      "User-Agent":
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115 Safari/537.36",
-      "Accept": "*/*",
-      "Accept-Language": "en-US,en;q=0.9",
-      "Referer": "https://doofootball.vip/",
-      "Origin": "https://doofootball.vip/",
-      "Connection": "keep-alive",
-    };
-    if (req.headers.range) headers.Range = req.headers.range;
+    const headers = getCommonHeaders("https://doofootball.vip/");
+    
+    // เพิ่ม Range header ถ้ามี
+    if (req.headers.range) {
+      headers.Range = req.headers.range;
+    }
 
-    const response = await fetch(streamUrl, { headers, redirect: "follow" });
-    if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    // ลอง fetch หลายครั้ง
+    let response;
+    let attempts = 0;
+    const maxAttempts = 3;
+    
+    while (attempts < maxAttempts) {
+      try {
+        response = await fetch(streamUrl, { 
+          headers, 
+          redirect: "follow",
+          timeout: 15000 
+        });
+        
+        if (response.ok) break;
+        
+        if (response.status === 403) {
+          // ลอง delay แล้ว retry
+          await new Promise(resolve => setTimeout(resolve, 1000 * (attempts + 1)));
+        }
+        
+        attempts++;
+      } catch (fetchErr) {
+        attempts++;
+        if (attempts >= maxAttempts) throw fetchErr;
+        await new Promise(resolve => setTimeout(resolve, 1000 * attempts));
+      }
+    }
+
+    if (!response || !response.ok) {
+      throw new Error(`HTTP ${response?.status || 'TIMEOUT'}: ${response?.statusText || 'Request failed'}`);
+    }
 
     const contentType = response.headers.get("content-type") || "application/vnd.apple.mpegurl";
 
@@ -167,20 +219,30 @@ app.get("/api/football/stream", async (req, res) => {
         const absolute = baseUrl + trimmed;
         return `/api/football/stream?url=${encodeURIComponent(absolute)}`;
       });
+      
       res.set({
         "Content-Type": "application/vnd.apple.mpegurl",
         "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Headers": "*",
         "Cache-Control": "no-cache, no-store, must-revalidate",
       });
       res.send(modified);
     } else {
+      // สำหรับ .ts files
       res.set({
         "Content-Type": contentType,
         "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Headers": "*", 
         "Cache-Control": "no-cache, no-store, must-revalidate",
         "Accept-Ranges": "bytes",
       });
-      response.body.pipe(res); // ใช้ได้เลย
+      
+      if (response.body) {
+        response.body.pipe(res);
+      } else {
+        const buffer = await response.buffer();
+        res.send(buffer);
+      }
     }
   } catch (err) {
     console.error("Error proxying football stream:", err);
@@ -222,13 +284,17 @@ app.get("/api/tv/stream", async (req, res) => {
   if (!targetUrl) return res.status(400).json({ success: false, error: "Missing url parameter" });
 
   try {
+    const headers = getCommonHeaders("https://www.dooballfree24hrs.com/");
+    
     const response = await fetch(targetUrl, {
-      headers: {
-        "Referer": "https://www.dooballfree24hrs.com/",
-        "User-Agent": req.headers["user-agent"] || "Mozilla/5.0",
-      },
+      headers,
       redirect: "follow",
+      timeout: 15000
     });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
 
     const contentType = response.headers.get("content-type") || "";
     if (contentType.includes("application/vnd.apple.mpegurl") || targetUrl.endsWith(".m3u8")) {
@@ -238,13 +304,28 @@ app.get("/api/tv/stream", async (req, res) => {
         const segmentUrl = m.startsWith("http") ? m : baseUrl + m;
         return `/api/tv/stream?url=${encodeURIComponent(segmentUrl)}`;
       });
-      res.set("Content-Type", "application/vnd.apple.mpegurl");
+      res.set({
+        "Content-Type": "application/vnd.apple.mpegurl",
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Headers": "*"
+      });
       res.send(playlist);
     } else {
-      res.set("Content-Type", contentType || "application/octet-stream");
-      response.body.pipe(res);
+      res.set({
+        "Content-Type": contentType || "application/octet-stream",
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Headers": "*"
+      });
+      
+      if (response.body) {
+        response.body.pipe(res);
+      } else {
+        const buffer = await response.buffer();
+        res.send(buffer);
+      }
     }
   } catch (err) {
+    console.error("Error proxying TV stream:", err);
     res.status(500).json({ success: false, error: err.message });
   }
 });

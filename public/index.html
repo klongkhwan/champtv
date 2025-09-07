@@ -846,6 +846,8 @@
             e.preventDefault();
             const proxyUrl = `/api/football/stream?url=${encodeURIComponent(stream.dataUrl)}`;
             playStream(proxyUrl, `${matchData.homeTeam} vs ${matchData.awayTeam}`);
+
+
           };
           streamLink.innerHTML = `<img src="${stream.img}" alt="${stream.alt}" loading="lazy" class="stream-icon">
                                   <span class="stream-label">${stream.alt}</span>`;
